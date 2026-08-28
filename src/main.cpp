@@ -10,13 +10,15 @@
 const char* WIFI_SSID = "Wokwi-GUEST";
 const char* WIFI_PASSWORD = "";
 
-
 // ======================================================
-// HARDWARE
+// LED PIN
 // ======================================================
 
-#define LED_PIN 26
+// Sawi    -> LED merah  -> GPIO 26
+// Kangkung -> LED kuning -> GPIO 17
 
+#define SAWI_LED_PIN 26
+#define KANGKUNG_LED_PIN 17
 
 // ======================================================
 // SERVER
@@ -25,31 +27,86 @@ const char* WIFI_PASSWORD = "";
 WebServer server(80);
 WebSocketsServer webSocket(81);
 
-
 // ======================================================
-// APPLICATION STATE
+// TANAMAN YANG DIPILIH
 // ======================================================
 
-// Tanaman yang dipilih
 String selectedPlant = "sawi";
 
-// Mode cahaya
-// "auto" atau "manual"
-String lightMode = "manual";
+// ======================================================
+// STATUS MASING-MASING LED
+// ======================================================
 
-// Status LED
-bool ledState = false;
-
-// Durasi Auto dalam milliseconds
-// Default = 5 detik
-unsigned long autoDuration = 5000;
-
-// Waktu terakhir LED berubah
-unsigned long autoLastChange = 0;
-
+bool sawiLedState = false;
+bool kangkungLedState = false;
 
 // ======================================================
-// HTML WEBSITE
+// DURASI MASING-MASING LED
+// Default 5 detik
+// ======================================================
+
+unsigned long sawiDuration = 5000;
+unsigned long kangkungDuration = 5000;
+
+// ======================================================
+// WAKTU LED MULAI MENYALA
+// ======================================================
+
+unsigned long sawiStartTime = 0;
+unsigned long kangkungStartTime = 0;
+
+// ======================================================
+// MODE MASING-MASING LED
+//
+// "manual"  = ON/OFF manual
+// "duration" = menyala selama durasi lalu mati
+// ======================================================
+
+String sawiMode = "manual";
+String kangkungMode = "manual";
+
+// ======================================================
+// HELPER
+// ======================================================
+
+int getSelectedPin() {
+
+    if (selectedPlant == "kangkung") {
+        return KANGKUNG_LED_PIN;
+    }
+
+    return SAWI_LED_PIN;
+}
+
+bool getSelectedLedState() {
+
+    if (selectedPlant == "kangkung") {
+        return kangkungLedState;
+    }
+
+    return sawiLedState;
+}
+
+String getSelectedMode() {
+
+    if (selectedPlant == "kangkung") {
+        return kangkungMode;
+    }
+
+    return sawiMode;
+}
+
+unsigned long getSelectedDuration() {
+
+    if (selectedPlant == "kangkung") {
+        return kangkungDuration;
+    }
+
+    return sawiDuration;
+}
+
+// ======================================================
+// HTML
 // ======================================================
 
 const char INDEX_HTML[] PROGMEM = R"rawliteral(
@@ -64,388 +121,160 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0"
+        content="width=device-width, initial-scale=1"
     >
 
-    <title>UDAWA System</title>
+    <title>UDAWA Smart System</title>
 
+    <!-- Pico CSS -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+    >
 
     <style>
 
-        * {
-            box-sizing: border-box;
-        }
-
-
         body {
-
-            margin: 0;
-
-            padding: 40px 20px;
-
-            font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-
-            background: #f4f7f6;
-
-            color: #222;
-
+            background: #f5f7f5;
         }
 
-
-        .container {
-
-            width: 500px;
-
-            max-width: 100%;
-
+        main {
+            max-width: 720px;
             margin: auto;
-
-            background: white;
-
-            padding: 30px;
-
-            border-radius: 20px;
-
-            box-shadow:
-                0 10px 30px
-                rgba(0, 0, 0, 0.08);
-
-        }
-
-
-        .title {
-
-            text-align: center;
-
-            margin-bottom: 30px;
-
-        }
-
-
-        .title h1 {
-
-            margin: 0;
-
-            font-size: 30px;
-
-        }
-
-
-        .title p {
-
-            margin-top: 8px;
-
-            color: #777;
-
-        }
-
-
-        .section {
-
-            margin-top: 25px;
-
-        }
-
-
-        .section-title {
-
-            font-size: 18px;
-
-            font-weight: bold;
-
-            margin-bottom: 12px;
-
-        }
-
-
-        .options {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(2, 1fr);
-
-            gap: 12px;
-
-        }
-
-
-        button {
-
-            width: 100%;
-
-            padding: 16px;
-
-            border: none;
-
-            border-radius: 12px;
-
-            font-size: 16px;
-
-            font-weight: bold;
-
-            cursor: pointer;
-
-            transition:
-                transform 0.15s,
-                opacity 0.15s;
-
-        }
-
-
-        button:hover {
-
-            opacity: 0.85;
-
-            transform: translateY(-2px);
-
-        }
-
-
-        button:active {
-
-            transform:
-                translateY(0);
-
-        }
-
-
-        .plant-button {
-
-            background: #e8f5e9;
-
-            color: #2e7d32;
-
-        }
-
-
-        .plant-button.active {
-
-            background: #2e7d32;
-
-            color: white;
-
-        }
-
-
-        .mode-button {
-
-            background: #e3f2fd;
-
-            color: #1565c0;
-
-        }
-
-
-        .mode-button.active {
-
-            background: #1565c0;
-
-            color: white;
-
-        }
-
-
-        .led-buttons {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(2, 1fr);
-
-            gap: 12px;
-
-        }
-
-
-        .on-button {
-
-            background: #43a047;
-
-            color: white;
-
-        }
-
-
-        .off-button {
-
-            background: #e53935;
-
-            color: white;
-
-        }
-
-
-        .status-box {
-
-            margin-top: 25px;
-
             padding: 20px;
+        }
 
-            border-radius: 15px;
-
-            background: #f5f5f5;
-
+        header {
             text-align: center;
-
+            margin-bottom: 30px;
         }
 
+        header h1 {
+            margin-bottom: 5px;
+        }
 
-        .status-title {
-
+        header p {
             color: #777;
-
-            font-size: 14px;
-
+            margin-top: 0;
         }
 
+        .plant-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
 
-        .led-status {
+        .plant-card {
+            cursor: pointer;
+            text-align: center;
+            padding: 20px;
+            border: 2px solid transparent;
+            transition: 0.2s;
+        }
 
-            margin-top: 8px;
+        .plant-card.active {
+            border-color: #2e7d32;
+            background: #edf7ee;
+        }
 
+        .plant-icon {
+            font-size: 35px;
+            margin-bottom: 5px;
+        }
+
+        .lamp-status {
+            text-align: center;
+            padding: 25px;
+        }
+
+        .lamp-icon {
+            font-size: 55px;
+            margin-bottom: 10px;
+            filter: grayscale(1);
+            opacity: 0.35;
+        }
+
+        .lamp-icon.on {
+            filter: none;
+            opacity: 1;
+        }
+
+        .status-on {
+            color: #2e7d32;
+        }
+
+        .status-off {
+            color: #777;
+        }
+
+        .timer {
             font-size: 28px;
-
             font-weight: bold;
-
-        }
-
-
-        .led-on {
-
-            color: #43a047;
-
-        }
-
-
-        .led-off {
-
-            color: #e53935;
-
-        }
-
-
-        /* ==========================================
-           COUNTDOWN TIMER
-           ========================================== */
-
-        .countdown-box {
-
-            margin-top: 15px;
-
-            padding: 12px;
-
-            background: #fff3e0;
-
-            border-radius: 10px;
-
             color: #e65100;
-
-            font-size: 18px;
-
-            font-weight: bold;
-
-            display: none;
-
         }
 
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
 
-        .connection {
+        .duration-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
 
-            margin-top: 20px;
-
-            text-align: center;
-
+        .duration-grid button {
+            margin: 0;
+            padding: 10px 5px;
             font-size: 14px;
-
-            color: #777;
-
         }
 
-
-        .connected {
-
-            color: #43a047;
-
-            font-weight: bold;
-
+        .duration-grid button.active {
+            background: #2e7d32;
+            border-color: #2e7d32;
         }
-
-
-        .disconnected {
-
-            color: #e53935;
-
-            font-weight: bold;
-
-        }
-
-
-        .info {
-
-            margin-top: 20px;
-
-            padding: 15px;
-
-            background: #fafafa;
-
-            border-radius: 10px;
-
-            font-size: 14px;
-
-        }
-
 
         .info-row {
-
             display: flex;
-
-            justify-content:
-                space-between;
-
-            margin-bottom: 8px;
-
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
         }
-
 
         .info-row:last-child {
-
-            margin-bottom: 0;
-
+            border-bottom: none;
         }
 
-
-        /* ==========================================
-           AUTO DURATION
-           ========================================== */
-
-        .auto-duration-select {
-
-            width: 100%;
-
-            padding: 16px;
-
-            border: none;
-
-            border-radius: 12px;
-
-            background: #fff3e0;
-
-            color: #e65100;
-
-            font-size: 16px;
-
-            font-weight: bold;
-
-            cursor: pointer;
-
-            outline: none;
-
+        .connection {
+            text-align: center;
+            font-size: 14px;
         }
 
+        .connected {
+            color: #2e7d32;
+        }
+
+        .disconnected {
+            color: #c62828;
+        }
+
+        @media (max-width: 600px) {
+
+            .plant-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .duration-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+        }
 
     </style>
 
@@ -454,275 +283,241 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
 <body>
 
-
-<div class="container">
-
+<main>
 
     <!-- ========================================= -->
-    <!-- TITLE -->
+    <!-- HEADER -->
     <!-- ========================================= -->
 
-    <div class="title">
+    <header>
 
-        <h1>
-            🌱 UDAWA Smart System
-        </h1>
+        <h1>🌱 UDAWA</h1>
 
         <p>
-            ESP32 WebSocket Control
+            UDAWA Smart System
         </p>
 
-    </div>
+    </header>
 
 
     <!-- ========================================= -->
-    <!-- PLANT SELECTION -->
+    <!-- PILIH TANAMAN -->
     <!-- ========================================= -->
 
-    <div class="section">
+    <article>
 
-        <div class="section-title">
+        <h3>Pilih Tanaman</h3>
 
-            Pilih Tanaman
+        <div class="plant-grid">
 
-        </div>
-
-
-        <div class="options">
-
-
-            <button
+            <article
                 id="plant-sawi"
-                class="plant-button active"
+                class="plant-card active"
                 onclick="selectPlant('sawi')"
             >
 
-                🌱 Sawi
+                <div class="plant-icon">
+                    🌱
+                </div>
 
-            </button>
+                <strong>
+                    Sawi
+                </strong>
+
+                <small>
+                    Lampu Merah
+                </small>
+
+            </article>
 
 
-            <button
+            <article
                 id="plant-kangkung"
-                class="plant-button"
+                class="plant-card"
                 onclick="selectPlant('kangkung')"
             >
 
-                🌿 Kangkung
+                <div class="plant-icon">
+                    🌿
+                </div>
 
-            </button>
+                <strong>
+                    Kangkung
+                </strong>
 
+                <small>
+                    Lampu Kuning
+                </small>
 
-        </div>
-
-    </div>
-
-
-    <!-- ========================================= -->
-    <!-- LIGHT MODE -->
-    <!-- ========================================= -->
-
-    <div class="section">
-
-        <div class="section-title">
-
-            Mode Cahaya
+            </article>
 
         </div>
 
-
-        <div class="options">
-
-
-            <button
-                id="mode-auto"
-                class="mode-button"
-                onclick="selectMode('auto')"
-            >
-
-                🤖 Auto
-
-            </button>
-
-
-            <button
-                id="mode-manual"
-                class="mode-button active"
-                onclick="selectMode('manual')"
-            >
-
-                🎛️ Manual
-
-            </button>
-
-
-        </div>
-
-    </div>
+    </article>
 
 
     <!-- ========================================= -->
-    <!-- AUTO DURATION -->
+    <!-- STATUS LAMPU -->
     <!-- ========================================= -->
 
-    <div
-        id="auto-duration-control"
-        class="section"
-        style="display:none"
-    >
+    <article class="lamp-status">
 
-        <div class="section-title">
-
-            Durasi Auto
-
+        <div
+            id="lamp-icon"
+            class="lamp-icon"
+        >
+            💡
         </div>
 
+        <h2 id="plant-name">
+            Sawi
+        </h2>
 
-        <select
-            id="auto-duration"
-            class="auto-duration-select"
-            onchange="setAutoDuration(this.value)"
+        <h3
+            id="lamp-status"
+            class="status-off"
+        >
+            LAMPU MATI
+        </h3>
+
+
+        <div
+            id="timer-box"
+            style="display:none"
         >
 
-            <option value="5">
-                5 detik
-            </option>
+            <small>
+                Lampu akan mati dalam
+            </small>
 
-            <option value="10">
-                10 detik
-            </option>
-
-            <option value="15">
-                15 detik
-            </option>
-
-            <option value="20">
-                20 detik
-            </option>
-
-            <option value="25">
-                25 detik
-            </option>
-
-            <option value="30">
-                30 detik
-            </option>
-
-            <option value="35">
-                35 detik
-            </option>
-
-            <option value="40">
-                40 detik
-            </option>
-
-            <option value="45">
-                45 detik
-            </option>
-
-            <option value="50">
-                50 detik
-            </option>
-
-            <option value="55">
-                55 detik
-            </option>
-
-            <option value="60">
-                1 menit
-            </option>
-
-        </select>
-
-    </div>
-
-
-    <!-- ========================================= -->
-    <!-- MANUAL LED CONTROL -->
-    <!-- ========================================= -->
-
-    <div
-        id="manual-control"
-        class="section"
-    >
-
-        <div class="section-title">
-
-            Kontrol Lampu
+            <div
+                id="timer"
+                class="timer"
+            >
+                0 detik
+            </div>
 
         </div>
 
+    </article>
 
-        <div class="led-buttons">
 
+    <!-- ========================================= -->
+    <!-- MODE MANUAL -->
+    <!-- ========================================= -->
+
+    <article>
+
+        <h3>Kontrol Manual</h3>
+
+        <p>
+            Nyalakan atau matikan lampu secara langsung.
+        </p>
+
+        <div class="control-grid">
 
             <button
-                class="on-button"
-                onclick="setLed(true)"
+                onclick="manualOn()"
             >
-
                 💡 ON
-
             </button>
-
 
             <button
-                class="off-button"
-                onclick="setLed(false)"
+                class="secondary"
+                onclick="manualOff()"
             >
-
-                🔴 OFF
-
+                ⛔ OFF
             </button>
 
-
         </div>
 
-    </div>
+    </article>
 
 
     <!-- ========================================= -->
-    <!-- STATUS -->
+    <!-- DURASI -->
     <!-- ========================================= -->
 
-    <div class="status-box">
+    <article>
 
-        <div class="status-title">
+        <h3>Nyala Berdurasi</h3>
 
-            STATUS LAMPU
+        <p>
+            Lampu akan menyala sekali selama durasi
+            yang dipilih, lalu mati.
+        </p>
+
+
+        <div class="duration-grid">
+
+            <button
+                id="duration-5"
+                onclick="setDuration(5)"
+            >
+                5s
+            </button>
+
+            <button
+                id="duration-10"
+                onclick="setDuration(10)"
+            >
+                10s
+            </button>
+
+            <button
+                id="duration-15"
+                onclick="setDuration(15)"
+            >
+                15s
+            </button>
+
+            <button
+                id="duration-20"
+                onclick="setDuration(20)"
+            >
+                20s
+            </button>
+
+            <button
+                id="duration-30"
+                onclick="setDuration(30)"
+            >
+                30s
+            </button>
+
+            <button
+                id="duration-40"
+                onclick="setDuration(40)"
+            >
+                40s
+            </button>
+
+            <button
+                id="duration-50"
+                onclick="setDuration(50)"
+            >
+                50s
+            </button>
+
+            <button
+                id="duration-60"
+                onclick="setDuration(60)"
+            >
+                1 menit
+            </button>
 
         </div>
 
-
-        <div
-            id="led-status"
-            class="led-status led-off"
-        >
-
-            💡 LAMPU MATI
-
-        </div>
-
-
-        <!-- TAMPILAN COUNTDOWN TIMER -->
-        <div
-            id="countdown-timer"
-            class="countdown-box"
-        >
-
-            ⏱️ Sisa Waktu: <span id="timer-val">0</span> detik
-
-        </div>
-
-    </div>
+    </article>
 
 
     <!-- ========================================= -->
-    <!-- INFORMATION -->
+    <!-- INFORMASI -->
     <!-- ========================================= -->
 
-    <div class="info">
+    <article>
 
+        <h3>Informasi</h3>
 
         <div class="info-row">
 
@@ -730,8 +525,21 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
                 Tanaman
             </span>
 
-            <strong id="plant-status">
+            <strong id="info-plant">
                 Sawi
+            </strong>
+
+        </div>
+
+
+        <div class="info-row">
+
+            <span>
+                GPIO
+            </span>
+
+            <strong id="info-pin">
+                26
             </strong>
 
         </div>
@@ -743,31 +551,26 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
                 Mode
             </span>
 
-            <strong id="mode-status">
+            <strong id="info-mode">
                 Manual
             </strong>
 
         </div>
 
 
-        <div
-            class="info-row"
-            id="duration-status-row"
-            style="display:none"
-        >
+        <div class="info-row">
 
             <span>
-                Durasi Auto
+                Durasi
             </span>
 
-            <strong id="duration-status">
+            <strong id="info-duration">
                 5 detik
             </strong>
 
         </div>
 
-
-    </div>
+    </article>
 
 
     <!-- ========================================= -->
@@ -778,28 +581,23 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         id="connection"
         class="connection disconnected"
     >
-
-        🔴 WebSocket: Disconnected
-
+        🔴 WebSocket Disconnected
     </div>
 
-
-</div>
+</main>
 
 
 <script>
 
-
 // ==================================================
-// WEBSOCKET (Port asli 8181)
+// WEBSOCKET
+// PORT TETAP 81
 // ==================================================
 
 const socket = new WebSocket(
-
     "ws://" +
     window.location.hostname +
     ":8181"
-
 );
 
 let countdownInterval = null;
@@ -807,25 +605,18 @@ let currentRemainingTime = 0;
 
 
 // ==================================================
-// WEBSOCKET CONNECTED
+// CONNECTED
 // ==================================================
 
 socket.onopen = function() {
-
-    console.log(
-        "WebSocket connected"
-    );
-
 
     const connection =
         document.getElementById(
             "connection"
         );
 
-
     connection.innerText =
-        "🟢 WebSocket: Connected";
-
+        "🟢 WebSocket Connected";
 
     connection.className =
         "connection connected";
@@ -834,33 +625,24 @@ socket.onopen = function() {
 
 
 // ==================================================
-// RECEIVE MESSAGE
+// MESSAGE
 // ==================================================
 
 socket.onmessage = function(event) {
 
-    console.log(
-        "Received:",
-        event.data
-    );
-
-
     try {
 
         const data =
-            JSON.parse(
-                event.data
-            );
-
+            JSON.parse(event.data);
 
         updateUI(data);
 
     }
 
-    catch (error) {
+    catch(error) {
 
         console.error(
-            "Invalid JSON:",
+            "Invalid JSON",
             error
         );
 
@@ -870,25 +652,18 @@ socket.onmessage = function(event) {
 
 
 // ==================================================
-// WEBSOCKET DISCONNECTED
+// DISCONNECTED
 // ==================================================
 
 socket.onclose = function() {
-
-    console.log(
-        "WebSocket disconnected"
-    );
-
 
     const connection =
         document.getElementById(
             "connection"
         );
 
-
     connection.innerText =
-        "🔴 WebSocket: Disconnected";
-
+        "🔴 WebSocket Disconnected";
 
     connection.className =
         "connection disconnected";
@@ -897,68 +672,185 @@ socket.onclose = function() {
 
 
 // ==================================================
-// COUNTDOWN TIMER LOGIC
+// PILIH TANAMAN
+// ==================================================
+
+function selectPlant(plant) {
+
+    if (
+        socket.readyState !==
+        WebSocket.OPEN
+    ) {
+        return;
+    }
+
+    socket.send(
+        JSON.stringify({
+            type: "plant",
+            value: plant
+        })
+    );
+
+}
+
+
+// ==================================================
+// MANUAL ON
+// ==================================================
+
+function manualOn() {
+
+    if (
+        socket.readyState !==
+        WebSocket.OPEN
+    ) {
+        return;
+    }
+
+    socket.send(
+        JSON.stringify({
+            type: "manual",
+            value: true
+        })
+    );
+
+}
+
+
+// ==================================================
+// MANUAL OFF
+// ==================================================
+
+function manualOff() {
+
+    if (
+        socket.readyState !==
+        WebSocket.OPEN
+    ) {
+        return;
+    }
+
+    socket.send(
+        JSON.stringify({
+            type: "manual",
+            value: false
+        })
+    );
+
+}
+
+
+// ==================================================
+// SET DURASI
+// ==================================================
+
+function setDuration(seconds) {
+
+    if (
+        socket.readyState !==
+        WebSocket.OPEN
+    ) {
+        return;
+    }
+
+    socket.send(
+        JSON.stringify({
+            type: "duration",
+            value: Number(seconds)
+        })
+    );
+
+}
+
+
+// ==================================================
+// COUNTDOWN
 // ==================================================
 
 function startCountdown(seconds) {
 
-    clearInterval(countdownInterval);
-    currentRemainingTime = seconds;
+    clearInterval(
+        countdownInterval
+    );
+
+    currentRemainingTime =
+        seconds;
 
     const timerBox =
         document.getElementById(
-            "countdown-timer"
+            "timer-box"
         );
 
-    const timerVal =
+    const timer =
         document.getElementById(
-            "timer-val"
+            "timer"
         );
 
-    if (seconds > 0) {
-
-        timerBox.style.display =
-            "block";
-
-        timerVal.innerText =
-            currentRemainingTime;
-
-        countdownInterval = setInterval(() => {
-
-            currentRemainingTime--;
-
-            if (currentRemainingTime <= 0) {
-
-                clearInterval(countdownInterval);
-
-                timerBox.style.display =
-                    "none";
-
-            } else {
-
-                timerVal.innerText =
-                    currentRemainingTime;
-
-            }
-
-        }, 1000);
-
-    } else {
+    if (seconds <= 0) {
 
         timerBox.style.display =
             "none";
 
+        return;
+
     }
+
+    timerBox.style.display =
+        "block";
+
+    timer.innerText =
+        currentRemainingTime +
+        " detik";
+
+
+    countdownInterval =
+        setInterval(
+            function() {
+
+                currentRemainingTime--;
+
+                if (
+                    currentRemainingTime <= 0
+                ) {
+
+                    clearInterval(
+                        countdownInterval
+                    );
+
+                    timerBox.style.display =
+                        "none";
+
+                }
+
+                else {
+
+                    timer.innerText =
+                        currentRemainingTime +
+                        " detik";
+
+                }
+
+            },
+            1000
+        );
 
 }
 
+
+// ==================================================
+// STOP COUNTDOWN
+// ==================================================
+
 function stopCountdown() {
 
-    clearInterval(countdownInterval);
+    clearInterval(
+        countdownInterval
+    );
 
     document.getElementById(
-        "countdown-timer"
-    ).style.display = "none";
+        "timer-box"
+    ).style.display =
+        "none";
 
 }
 
@@ -969,64 +861,42 @@ function stopCountdown() {
 
 function updateUI(data) {
 
-
     // ----------------------------------------------
-    // LED & COUNTDOWN
-    // ----------------------------------------------
-
-    if (data.led === true) {
-
-        document.getElementById(
-            "led-status"
-        ).innerText =
-            "💡 LAMPU HIDUP";
-
-
-        document.getElementById(
-            "led-status"
-        ).className =
-            "led-status led-on";
-
-        if (data.mode === "auto" && data.autoDuration) {
-
-            startCountdown(
-                Number(data.autoDuration)
-            );
-
-        }
-
-    }
-
-    else {
-
-        document.getElementById(
-            "led-status"
-        ).innerText =
-            "🔴 LAMPU MATI";
-
-
-        document.getElementById(
-            "led-status"
-        ).className =
-            "led-status led-off";
-
-        stopCountdown();
-
-    }
-
-
-    // ----------------------------------------------
-    // PLANT
+    // TANAMAN
     // ----------------------------------------------
 
     if (data.plant) {
 
+        const plant =
+            data.plant;
+
+        const plantName =
+            plant === "sawi"
+                ? "Sawi"
+                : "Kangkung";
+
+        const gpio =
+            plant === "sawi"
+                ? "26"
+                : "17";
+
+
         document.getElementById(
-            "plant-status"
+            "plant-name"
         ).innerText =
-            capitalize(
-                data.plant
-            );
+            plantName;
+
+
+        document.getElementById(
+            "info-plant"
+        ).innerText =
+            plantName;
+
+
+        document.getElementById(
+            "info-pin"
+        ).innerText =
+            gpio;
 
 
         document.getElementById(
@@ -1044,10 +914,65 @@ function updateUI(data) {
 
 
         document.getElementById(
-            "plant-" + data.plant
+            "plant-" + plant
         ).classList.add(
             "active"
         );
+
+    }
+
+
+    // ----------------------------------------------
+    // LED STATUS
+    // ----------------------------------------------
+
+    if (
+        typeof data.led !==
+        "undefined"
+    ) {
+
+        const status =
+            document.getElementById(
+                "lamp-status"
+            );
+
+        const icon =
+            document.getElementById(
+                "lamp-icon"
+            );
+
+
+        if (data.led === true) {
+
+            status.innerText =
+                "LAMPU HIDUP";
+
+            status.className =
+                "status-on";
+
+
+            icon.classList.add(
+                "on"
+            );
+
+        }
+
+        else {
+
+            status.innerText =
+                "LAMPU MATI";
+
+            status.className =
+                "status-off";
+
+
+            icon.classList.remove(
+                "on"
+            );
+
+            stopCountdown();
+
+        }
 
     }
 
@@ -1059,296 +984,95 @@ function updateUI(data) {
     if (data.mode) {
 
         document.getElementById(
-            "mode-status"
+            "info-mode"
         ).innerText =
-            capitalize(
-                data.mode
-            );
-
-
-        document.getElementById(
-            "mode-auto"
-        ).classList.remove(
-            "active"
-        );
-
-
-        document.getElementById(
-            "mode-manual"
-        ).classList.remove(
-            "active"
-        );
-
-
-        document.getElementById(
-            "mode-" + data.mode
-        ).classList.add(
-            "active"
-        );
-
-
-        // ------------------------------------------
-        // Manual control visibility
-        // ------------------------------------------
-
-        const manualControl =
-            document.getElementById(
-                "manual-control"
-            );
-
-
-        if (data.mode === "manual") {
-
-            manualControl.style.display =
-                "block";
-
-            stopCountdown();
-
-        }
-
-        else {
-
-            manualControl.style.display =
-                "none";
-
-        }
-
-
-        // ------------------------------------------
-        // Auto duration visibility
-        // ------------------------------------------
-
-        const autoDurationControl =
-            document.getElementById(
-                "auto-duration-control"
-            );
-
-
-        const durationStatusRow =
-            document.getElementById(
-                "duration-status-row"
-            );
-
-
-        if (data.mode === "auto") {
-
-            autoDurationControl.style.display =
-                "block";
-
-            durationStatusRow.style.display =
-                "flex";
-
-        }
-
-        else {
-
-            autoDurationControl.style.display =
-                "none";
-
-            durationStatusRow.style.display =
-                "none";
-
-        }
+            data.mode === "duration"
+                ? "Durasi"
+                : "Manual";
 
     }
 
 
     // ----------------------------------------------
-    // AUTO DURATION
+    // DURASI
     // ----------------------------------------------
 
-    if (data.autoDuration) {
+    if (data.duration) {
 
         const duration =
-            Number(
-                data.autoDuration
-            );
+            Number(data.duration);
 
 
         document.getElementById(
-            "auto-duration"
-        ).value =
-            duration;
-
-
-        const durationText =
+            "info-duration"
+        ).innerText =
             duration === 60
                 ? "1 menit"
                 : duration + " detik";
 
 
-        document.getElementById(
-            "duration-status"
-        ).innerText =
-            durationText;
+        // Hilangkan active semua
+        document
+            .querySelectorAll(
+                ".duration-grid button"
+            )
+            .forEach(
+                button => {
+                    button.classList.remove(
+                        "active"
+                    );
+                }
+            );
+
+
+        const selectedButton =
+            document.getElementById(
+                "duration-" +
+                duration
+            );
+
+
+        if (selectedButton) {
+
+            selectedButton.classList.add(
+                "active"
+            );
+
+        }
 
     }
 
-}
 
-
-// ==================================================
-// SELECT PLANT
-// ==================================================
-
-function selectPlant(plant) {
-
+    // ----------------------------------------------
+    // COUNTDOWN
+    // ----------------------------------------------
 
     if (
-        socket.readyState !==
-        WebSocket.OPEN
+        data.led === true &&
+        data.mode === "duration" &&
+        data.remaining > 0
     ) {
 
-        console.log(
-            "WebSocket belum terhubung"
+        startCountdown(
+            Number(data.remaining)
         );
-
-        return;
 
     }
 
-
-    const message = {
-
-        type: "plant",
-
-        value: plant
-
-    };
-
-
-    socket.send(
-        JSON.stringify(message)
-    );
-
 }
 
 
 // ==================================================
-// SELECT MODE
+// DEFAULT DURASI
 // ==================================================
 
-function selectMode(mode) {
-
-
-    if (
-        socket.readyState !==
-        WebSocket.OPEN
-    ) {
-
-        console.log(
-            "WebSocket belum terhubung"
-        );
-
-        return;
-
-    }
-
-
-    const message = {
-
-        type: "mode",
-
-        value: mode
-
-    };
-
-
-    socket.send(
-        JSON.stringify(message)
-    );
-
-}
-
-
-// ==================================================
-// SET AUTO DURATION
-// ==================================================
-
-function setAutoDuration(seconds) {
-
-
-    if (
-        socket.readyState !==
-        WebSocket.OPEN
-    ) {
-
-        console.log(
-            "WebSocket belum terhubung"
-        );
-
-        return;
-
-    }
-
-
-    const message = {
-
-        type: "autoDuration",
-
-        value: Number(seconds)
-
-    };
-
-
-    socket.send(
-        JSON.stringify(message)
-    );
-
-}
-
-
-// ==================================================
-// SET LED
-// ==================================================
-
-function setLed(state) {
-
-
-    if (
-        socket.readyState !==
-        WebSocket.OPEN
-    ) {
-
-        console.log(
-            "WebSocket belum terhubung"
-        );
-
-        return;
-
-    }
-
-
-    const message = {
-
-        type: "led",
-
-        value: state
-
-    };
-
-
-    socket.send(
-        JSON.stringify(message)
-    );
-
-}
-
-
-// ==================================================
-// CAPITALIZE
-// ==================================================
-
-function capitalize(text) {
-
-    return text.charAt(0).toUpperCase()
-        + text.slice(1);
-
-}
-
+document.getElementById(
+    "duration-5"
+).classList.add(
+    "active"
+);
 
 </script>
-
 
 </body>
 
@@ -1369,24 +1093,60 @@ void sendStatus() {
     message += selectedPlant;
     message += "\",";
 
-    message += "\"mode\":\"";
-    message += lightMode;
-    message += "\",";
-
     message += "\"led\":";
-    message += ledState
+    message += getSelectedLedState()
         ? "true"
         : "false";
 
     message += ",";
 
-    message += "\"autoDuration\":";
-    message += autoDuration / 1000;
+    message += "\"mode\":\"";
+    message += getSelectedMode();
+    message += "\",";
+
+    message += "\"duration\":";
+    message += getSelectedDuration() / 1000;
+
+    message += ",";
+
+    // ----------------------------------------------
+    // Hitung sisa waktu
+    // ----------------------------------------------
+
+    unsigned long remaining = 0;
+
+    if (
+        getSelectedMode() == "duration" &&
+        getSelectedLedState()
+    ) {
+
+        unsigned long elapsed =
+            millis() -
+            (
+                selectedPlant == "sawi"
+                    ? sawiStartTime
+                    : kangkungStartTime
+            );
+
+        unsigned long duration =
+            getSelectedDuration();
+
+        if (elapsed < duration) {
+
+            remaining =
+                (duration - elapsed + 999) /
+                1000;
+
+        }
+
+    }
+
+    message += "\"remaining\":";
+    message += remaining;
 
     message += "}";
 
 
-    // Kirim ke semua client
     webSocket.broadcastTXT(
         message
     );
@@ -1399,11 +1159,12 @@ void sendStatus() {
     Serial.println(
         message
     );
+
 }
 
 
 // ======================================================
-// SEND STATUS TO ONE CLIENT
+// SEND STATUS TO CLIENT
 // ======================================================
 
 void sendStatusToClient(
@@ -1416,19 +1177,54 @@ void sendStatusToClient(
     message += selectedPlant;
     message += "\",";
 
-    message += "\"mode\":\"";
-    message += lightMode;
-    message += "\",";
-
     message += "\"led\":";
-    message += ledState
+    message += getSelectedLedState()
         ? "true"
         : "false";
 
     message += ",";
 
-    message += "\"autoDuration\":";
-    message += autoDuration / 1000;
+    message += "\"mode\":\"";
+    message += getSelectedMode();
+    message += "\",";
+
+    message += "\"duration\":";
+    message += getSelectedDuration() / 1000;
+
+    message += ",";
+
+
+    unsigned long remaining = 0;
+
+    if (
+        getSelectedMode() == "duration" &&
+        getSelectedLedState()
+    ) {
+
+        unsigned long elapsed =
+            millis() -
+            (
+                selectedPlant == "sawi"
+                    ? sawiStartTime
+                    : kangkungStartTime
+            );
+
+        unsigned long duration =
+            getSelectedDuration();
+
+        if (elapsed < duration) {
+
+            remaining =
+                (duration - elapsed + 999) /
+                1000;
+
+        }
+
+    }
+
+
+    message += "\"remaining\":";
+    message += remaining;
 
     message += "}";
 
@@ -1442,7 +1238,7 @@ void sendStatusToClient(
 
 
 // ======================================================
-// HANDLE WEBSOCKET EVENT
+// WEBSOCKET EVENT
 // ======================================================
 
 void webSocketEvent(
@@ -1457,44 +1253,33 @@ void webSocketEvent(
 
 ) {
 
-
     switch (type) {
 
 
         // ==========================================
-        // CLIENT DISCONNECTED
+        // DISCONNECTED
         // ==========================================
 
         case WStype_DISCONNECTED:
 
             Serial.printf(
-
                 "[WS] Client %u disconnected\n",
-
                 clientNum
-
             );
 
             break;
 
 
         // ==========================================
-        // CLIENT CONNECTED
+        // CONNECTED
         // ==========================================
 
         case WStype_CONNECTED:
 
             Serial.printf(
-
                 "[WS] Client %u connected\n",
-
                 clientNum
-
             );
-
-
-            // Kirim state saat ini
-            // hanya ke client baru
 
             sendStatusToClient(
                 clientNum
@@ -1504,7 +1289,7 @@ void webSocketEvent(
 
 
         // ==========================================
-        // TEXT MESSAGE
+        // TEXT
         // ==========================================
 
         case WStype_TEXT:
@@ -1527,7 +1312,7 @@ void webSocketEvent(
 
 
             // ======================================
-            // PLANT - SAWI
+            // SELECT PLANT
             // ======================================
 
             if (
@@ -1535,7 +1320,6 @@ void webSocketEvent(
                     "\"type\":\"plant\""
                 ) >= 0
             ) {
-
 
                 if (
                     message.indexOf(
@@ -1546,20 +1330,13 @@ void webSocketEvent(
                     selectedPlant =
                         "sawi";
 
-
                     Serial.println(
                         "[PLANT] Sawi selected"
                     );
 
-
                     sendStatus();
 
                 }
-
-
-                // ==================================
-                // PLANT - KANGKUNG
-                // ==================================
 
                 else if (
                     message.indexOf(
@@ -1570,12 +1347,10 @@ void webSocketEvent(
                     selectedPlant =
                         "kangkung";
 
-
                     Serial.println(
                         "[PLANT] Kangkung selected"
                     );
 
-
                     sendStatus();
 
                 }
@@ -1584,98 +1359,97 @@ void webSocketEvent(
 
 
             // ======================================
-            // MODE
+            // MANUAL CONTROL
             // ======================================
 
             else if (
                 message.indexOf(
-                    "\"type\":\"mode\""
+                    "\"type\":\"manual\""
                 ) >= 0
             ) {
 
+                bool state =
+                    message.indexOf(
+                        "\"value\":true"
+                    ) >= 0;
 
-                // ==================================
-                // AUTO
-                // ==================================
 
                 if (
-                    message.indexOf(
-                        "\"value\":\"auto\""
-                    ) >= 0
+                    selectedPlant ==
+                    "sawi"
                 ) {
 
-                    lightMode =
-                        "auto";
-
-
-                    // Mulai siklus Auto
-                    autoLastChange =
-                        millis();
-
-
-                    // Saat Auto dimulai,
-                    // LED langsung ON
-
-                    ledState =
-                        true;
-
-
-                    digitalWrite(
-                        LED_PIN,
-                        HIGH
-                    );
-
-
-                    Serial.println(
-                        "[MODE] Auto"
-                    );
-
-
-                    sendStatus();
-
-                }
-
-
-                // ==================================
-                // MANUAL
-                // ==================================
-
-                else if (
-                    message.indexOf(
-                        "\"value\":\"manual\""
-                    ) >= 0
-                ) {
-
-                    lightMode =
+                    sawiMode =
                         "manual";
 
+                    sawiLedState =
+                        state;
 
-                    Serial.println(
-                        "[MODE] Manual"
+                    digitalWrite(
+                        SAWI_LED_PIN,
+                        state
+                            ? HIGH
+                            : LOW
                     );
 
+                }
 
-                    sendStatus();
+                else {
+
+                    kangkungMode =
+                        "manual";
+
+                    kangkungLedState =
+                        state;
+
+                    digitalWrite(
+                        KANGKUNG_LED_PIN,
+                        state
+                            ? HIGH
+                            : LOW
+                    );
 
                 }
+
+
+                Serial.print(
+                    "[MANUAL] "
+                );
+
+                Serial.print(
+                    selectedPlant
+                );
+
+                Serial.print(
+                    " -> "
+                );
+
+                Serial.println(
+                    state
+                        ? "ON"
+                        : "OFF"
+                );
+
+
+                sendStatus();
 
             }
 
 
             // ======================================
-            // AUTO DURATION
+            // DURASI
             // ======================================
 
             else if (
                 message.indexOf(
-                    "\"type\":\"autoDuration\""
+                    "\"type\":\"duration\""
                 ) >= 0
             ) {
 
-                int duration = 0;
+                int duration =
+                    0;
 
 
-                // Cari posisi value
                 int valuePos =
                     message.indexOf(
                         "\"value\":"
@@ -1689,47 +1463,84 @@ void webSocketEvent(
                             valuePos + 8
                         );
 
-
                     duration =
                         valueString.toInt();
 
                 }
 
 
-             
-
+                // Pastikan 5 - 60 detik
                 if (
                     duration >= 5 &&
                     duration <= 60
                 ) {
 
-                    autoDuration =
-                        (unsigned long)duration
-                        * 1000UL;
+                    unsigned long durationMs =
+                        (unsigned long)duration *
+                        1000UL;
 
 
-                    // Reset timer & nyalakan lampu
-                    autoLastChange =
-                        millis();
+                    if (
+                        selectedPlant ==
+                        "sawi"
+                    ) {
 
-                    ledState =
-                        true;
+                        sawiDuration =
+                            durationMs;
 
-                    digitalWrite(
-                        LED_PIN,
-                        HIGH
-                    );
+                        sawiMode =
+                            "duration";
+
+                        sawiLedState =
+                            true;
+
+                        sawiStartTime =
+                            millis();
+
+                        digitalWrite(
+                            SAWI_LED_PIN,
+                            HIGH
+                        );
+
+                    }
+
+                    else {
+
+                        kangkungDuration =
+                            durationMs;
+
+                        kangkungMode =
+                            "duration";
+
+                        kangkungLedState =
+                            true;
+
+                        kangkungStartTime =
+                            millis();
+
+                        digitalWrite(
+                            KANGKUNG_LED_PIN,
+                            HIGH
+                        );
+
+                    }
 
 
                     Serial.print(
-                        "[AUTO] Duration: "
+                        "[DURATION] "
                     );
 
+                    Serial.print(
+                        selectedPlant
+                    );
+
+                    Serial.print(
+                        " -> "
+                    );
 
                     Serial.print(
                         duration
                     );
-
 
                     Serial.println(
                         " seconds"
@@ -1743,109 +1554,12 @@ void webSocketEvent(
                 else {
 
                     Serial.println(
-                        "[AUTO] Invalid duration"
+                        "[DURATION] Invalid duration"
                     );
 
                 }
 
             }
-
-
-            else if (
-                message.indexOf(
-                    "\"type\":\"led\""
-                ) >= 0
-            ) {
-
-
-                if (
-                    message.indexOf(
-                        "\"value\":true"
-                    ) >= 0
-                ) {
-
-                    if (
-                        lightMode ==
-                        "manual"
-                    ) {
-
-                        ledState =
-                            true;
-
-
-                        digitalWrite(
-                            LED_PIN,
-                            HIGH
-                        );
-
-
-                        Serial.println(
-                            "[LED] ON"
-                        );
-
-
-                        sendStatus();
-
-                    }
-
-                    else {
-
-                        Serial.println(
-                            "[LED] Ignored - Auto mode"
-                        );
-
-                    }
-
-                }
-
-
-                // ----------------------------------
-                // LED OFF
-                // ----------------------------------
-
-                else if (
-                    message.indexOf(
-                        "\"value\":false"
-                    ) >= 0
-                ) {
-
-
-                    if (
-                        lightMode ==
-                        "manual"
-                    ) {
-
-                        ledState =
-                            false;
-
-
-                        digitalWrite(
-                            LED_PIN,
-                            LOW
-                        );
-
-
-                        Serial.println(
-                            "[LED] OFF"
-                        );
-
-
-                        sendStatus();
-
-                    }
-
-                    else {
-
-                        Serial.println(
-                            "[LED] Ignored - Auto mode"
-                        );
-
-                    }
-
-                }
-
-            }
-
 
             break;
 
@@ -1868,13 +1582,9 @@ void webSocketEvent(
 void handleRoot() {
 
     server.send(
-
         200,
-
         "text/html",
-
         INDEX_HTML
-
     );
 
 }
@@ -1886,59 +1596,65 @@ void handleRoot() {
 
 void setup() {
 
-
-    // ==================================================
+    // ==============================================
     // SERIAL
-    // ==================================================
+    // ==============================================
 
     Serial.begin(
         115200
     );
 
-
     delay(1000);
 
 
     Serial.println();
-    Serial.println(
-        "================================="
-    );
-
-    Serial.println(
-        "UDAWA Smart System"
-    );
 
     Serial.println(
         "================================="
     );
 
+    Serial.println(
+        "UDAWA Smart Plant Lighting"
+    );
 
-    // ==================================================
+    Serial.println(
+        "================================="
+    );
+
+
+    // ==============================================
     // LED
-    // ==================================================
+    // ==============================================
 
     pinMode(
-        LED_PIN,
+        SAWI_LED_PIN,
+        OUTPUT
+    );
+
+    pinMode(
+        KANGKUNG_LED_PIN,
         OUTPUT
     );
 
 
     digitalWrite(
-        LED_PIN,
+        SAWI_LED_PIN,
+        LOW
+    );
+
+    digitalWrite(
+        KANGKUNG_LED_PIN,
         LOW
     );
 
 
-    // ==================================================
+    // ==============================================
     // WIFI
-    // ==================================================
+    // ==============================================
 
     WiFi.begin(
-
         WIFI_SSID,
-
         WIFI_PASSWORD
-
     );
 
 
@@ -1972,24 +1688,20 @@ void setup() {
         "IP Address: "
     );
 
-
     Serial.println(
         WiFi.localIP()
     );
 
 
-    // ==================================================
+    // ==============================================
     // HTTP SERVER
-    // ==================================================
+    // PORT 80
+    // ==============================================
 
     server.on(
-
         "/",
-
         handleRoot
-
     );
-
 
     server.begin();
 
@@ -1998,25 +1710,26 @@ void setup() {
         "HTTP Server started"
     );
 
+    Serial.println(
+        "HTTP Port: 80"
+    );
 
-    // ==================================================
+
+    // ==============================================
     // WEBSOCKET SERVER
-    // ==================================================
+    // PORT 81
+    // ==============================================
 
     webSocket.begin();
 
-
     webSocket.onEvent(
-
         webSocketEvent
-
     );
 
 
     Serial.println(
         "WebSocket Server started"
     );
-
 
     Serial.println(
         "WebSocket Port: 81"
@@ -2036,48 +1749,95 @@ void setup() {
 
 void loop() {
 
-
+    // ==============================================
     // HTTP
+    // ==============================================
+
     server.handleClient();
 
 
-    // WebSocket
+    // ==============================================
+    // WEBSOCKET
+    // ==============================================
+
     webSocket.loop();
 
 
+    unsigned long currentMillis =
+        millis();
+
+
     // ==================================================
-    // AUTO LIGHT TIMER (Nyala 1x Lalu Mati Total)
+    // TIMER SAWI
     // ==================================================
 
     if (
-        lightMode == "auto" &&
-        ledState == true
+        sawiMode == "duration" &&
+        sawiLedState == true
     ) {
-
-        unsigned long currentMillis =
-            millis();
-
 
         if (
             currentMillis -
-            autoLastChange >=
-            autoDuration
+            sawiStartTime >=
+            sawiDuration
         ) {
 
-            // Matikan LED
-            ledState = false;
+            sawiLedState =
+                false;
+
+            sawiMode =
+                "manual";
 
             digitalWrite(
-                LED_PIN,
+                SAWI_LED_PIN,
                 LOW
             );
 
 
             Serial.println(
-                "[AUTO] Timer Selesai - LED MATI"
+                "[TIMER] Sawi selesai -> OFF"
             );
 
-            // Update status ke interface
+
+            sendStatus();
+
+        }
+
+    }
+
+
+    // ==================================================
+    // TIMER KANGKUNG
+    // ==================================================
+
+    if (
+        kangkungMode == "duration" &&
+        kangkungLedState == true
+    ) {
+
+        if (
+            currentMillis -
+            kangkungStartTime >=
+            kangkungDuration
+        ) {
+
+            kangkungLedState =
+                false;
+
+            kangkungMode =
+                "manual";
+
+            digitalWrite(
+                KANGKUNG_LED_PIN,
+                LOW
+            );
+
+
+            Serial.println(
+                "[TIMER] Kangkung selesai -> OFF"
+            );
+
+
             sendStatus();
 
         }
