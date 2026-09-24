@@ -787,7 +787,7 @@ const char MAIN_HTML[] PROGMEM = R"rawliteral(
                     <div class="plant-name">
 
                         <span class="plant-icon">
-                            🌿
+                         🥬
                         </span>
 
                         Selada
@@ -959,7 +959,7 @@ const char MAIN_HTML[] PROGMEM = R"rawliteral(
                     <div class="plant-name">
 
                         <span class="plant-icon">
-                            🌱
+                            🍈
                         </span>
 
                         Melon
@@ -1128,7 +1128,7 @@ const char MAIN_HTML[] PROGMEM = R"rawliteral(
                     <div class="plant-name">
 
                         <span class="plant-icon">
-                            🌱
+                            🍅
                         </span>
 
                         Tomat
@@ -1297,7 +1297,7 @@ const char MAIN_HTML[] PROGMEM = R"rawliteral(
                     <div class="plant-name">
 
                         <span class="plant-icon">
-                            🌱
+                            🌶️
                         </span>
 
                         Cabai
