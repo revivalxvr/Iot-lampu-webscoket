@@ -398,6 +398,11 @@ const char TOMAT_HTML[] PROGMEM = R"rawliteral(
             background: #3da447;
         }
 
+        .btn-save {
+
+            background: #7f8c8d !important; /* Warna abu-abu untuk mode save */
+        }
+
 
         .btn-off {
 
@@ -751,7 +756,24 @@ const char TOMAT_HTML[] PROGMEM = R"rawliteral(
 
 
 
+                <!-- LAMP STATUS -->
 
+                <div class="lamp-status">
+
+                    <span
+                        id="relayBLampDot"
+                        class="lamp-dot"
+                    ></span>
+
+
+                    <span
+                        id="relayBLampText"
+                        class="lamp-text"
+                    >
+                        LAMPU MATI
+                    </span>
+
+                </div>
 
 
 
@@ -1302,17 +1324,18 @@ const char TOMAT_HTML[] PROGMEM = R"rawliteral(
 
     function handleModeChange(relay) {
         const modeSelect = document.getElementById("relay" + relay + "Mode");
-        const btnOff = document.getElementById("btnOff" + relay);
         const btnOn = document.getElementById("btnOn" + relay);
 
-        if (!modeSelect || !btnOff || !btnOn) return;
+        if (!modeSelect || !btnOn) return;
 
         if (modeSelect.value === "schedule") {
-            btnOff.style.display = "none";
             btnOn.innerHTML = "💾 Save";
+            btnOn.classList.remove("btn-on");
+            btnOn.classList.add("btn-save");
         } else {
-            btnOff.style.display = "";
             btnOn.innerHTML = "💡 ON";
+            btnOn.classList.remove("btn-save");
+            btnOn.classList.add("btn-on");
         }
     }
 
