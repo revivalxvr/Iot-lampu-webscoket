@@ -728,9 +728,9 @@ const char MELON_HTML[] PROGMEM = R"rawliteral(
 
 
 
-                <!-- SCHEDULE -->
+                <!-- SCHEDULE (Bungkus div dengan ID agar mudah di-hide/show) -->
 
-                <div class="field">
+                <div id="scheduleFieldA" class="field">
 
                     <label>
                         Jadwal Lampu
@@ -1306,14 +1306,17 @@ const char MELON_HTML[] PROGMEM = R"rawliteral(
     function handleModeChange(relay) {
         const modeSelect = document.getElementById("relay" + relay + "Mode");
         const btnOn = document.getElementById("btnOn" + relay);
+        const scheduleField = document.getElementById("scheduleField" + relay);
 
-        if (!modeSelect || !btnOn) return;
+        if (!modeSelect || !btnOn || !scheduleField) return;
 
         if (modeSelect.value === "schedule") {
+            scheduleField.style.display = "block"; // Tampilkan jadwal saat mode otomatis
             btnOn.innerHTML = "💾 Save";
             btnOn.classList.remove("btn-on");
             btnOn.classList.add("btn-save");
         } else {
+            scheduleField.style.display = "none"; // Sembunyikan jadwal saat mode manual
             btnOn.innerHTML = "💡 ON";
             btnOn.classList.remove("btn-save");
             btnOn.classList.add("btn-on");

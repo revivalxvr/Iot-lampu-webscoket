@@ -58,10 +58,6 @@ const char* NTP_SERVER_1 = "pool.ntp.org";
 const char* NTP_SERVER_2 = "time.nist.gov";
 
 
-// ======================================================
-// SCHEDULE
-// ======================================================
-
 enum ScheduleType
 {
     SCHEDULE_NONE = 0,
@@ -82,15 +78,6 @@ bool relayBAutoSchedule = false;
 bool relayCAutoSchedule = false;
 bool relayDAutoSchedule = false;
 
-
-// ======================================================
-// HTML
-// ======================================================
-
-// ======================================================
-// SET RELAY A
-// ======================================================
-
 void setRelayA(bool state)
 {
     relayAState = state;
@@ -100,11 +87,6 @@ void setRelayA(bool state)
         state ? HIGH : LOW
     );
 }
-
-
-// ======================================================
-// SET RELAY B
-// ======================================================
 
 void setRelayB(bool state)
 {
@@ -134,10 +116,6 @@ void setRelayD(bool state)
     );
 }
 
-// ======================================================
-// SEND RELAY STATUS
-// ======================================================
-
 void sendRelayStatus(
     uint8_t client = 255
 )
@@ -149,24 +127,11 @@ void sendRelayStatus(
     doc["relayC"] = relayCState;
     doc["relayD"] = relayDState;
 
-
-    /*
-     * Tetap kirim remainingA/B agar
-     * struktur response tetap sederhana
-     * dan kompatibel dengan frontend.
-     */
-
     doc["remainingA"] = 0;
     doc["remainingB"] = 0;
     doc["remainingC"] = 0;
     doc["remainingD"] = 0;
  
-
-
-    /*
-     * Kirim informasi schedule.
-     */
-
     doc["scheduleA"] =
         (int)relayASchedule;
 
@@ -215,8 +180,6 @@ void sendRelayStatus(
         );
     }
 }
-
-
 // ======================================================
 // CHECK CURRENT SCHEDULE
 // ======================================================
@@ -227,7 +190,6 @@ bool isScheduleActive(
 {
     struct tm timeinfo;
 
-
     if (!getLocalTime(&timeinfo))
     {
         Serial.println(
@@ -237,14 +199,12 @@ bool isScheduleActive(
         return false;
     }
 
-
     int hour =
         timeinfo.tm_hour;
 
 
     switch (schedule)
     {
-
         // ==================================================
         // PAGI
         // 06:00 - 11:00
@@ -257,7 +217,6 @@ bool isScheduleActive(
                 hour < 11
             );
 
-
         // ==================================================
         // SIANG
         // 12:00 - 17:00
@@ -269,7 +228,6 @@ bool isScheduleActive(
                 hour >= 12 &&
                 hour < 17
             );
-
 
         // ==================================================
         // MALAM
@@ -289,7 +247,6 @@ bool isScheduleActive(
             return false;
     }
 }
-
 
 // ======================================================
 // PRINT CURRENT WITA TIME

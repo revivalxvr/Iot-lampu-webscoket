@@ -725,9 +725,9 @@ const char SELADA_HTML[] PROGMEM = R"rawliteral(
 
 
 
-                <!-- SCHEDULE -->
+                <!-- SCHEDULE (Bungkus div dengan ID agar mudah di-hide/show) -->
 
-                <div class="field">
+                <div id="scheduleFieldC" class="field">
 
                     <label>
                         Jadwal Lampu
@@ -751,26 +751,6 @@ const char SELADA_HTML[] PROGMEM = R"rawliteral(
                         </option>
 
                     </select>
-
-                </div>
-
-
-                <!-- LAMP STATUS -->
-
-                <div class="lamp-status">
-
-                    <span
-                        id="relayCLampDot"
-                        class="lamp-dot"
-                    ></span>
-
-
-                    <span
-                        id="relayCLampText"
-                        class="lamp-text"
-                    >
-                        LAMPU MATI
-                    </span>
 
                 </div>
 
@@ -1321,14 +1301,17 @@ const char SELADA_HTML[] PROGMEM = R"rawliteral(
     function handleModeChange(relay) {
         const modeSelect = document.getElementById("relay" + relay + "Mode");
         const btnOn = document.getElementById("btnOn" + relay);
+        const scheduleField = document.getElementById("scheduleField" + relay);
 
-        if (!modeSelect || !btnOn) return;
+        if (!modeSelect || !btnOn || !scheduleField) return;
 
         if (modeSelect.value === "schedule") {
+            scheduleField.style.display = "block";
             btnOn.innerHTML = "💾 Save";
             btnOn.classList.remove("btn-on");
             btnOn.classList.add("btn-save");
         } else {
+            scheduleField.style.display = "none";
             btnOn.innerHTML = "💡 ON";
             btnOn.classList.remove("btn-save");
             btnOn.classList.add("btn-on");

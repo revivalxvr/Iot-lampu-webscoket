@@ -728,7 +728,7 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
 
                 <!-- SCHEDULE -->
 
-                <div class="field">
+                <div id="scheduleFieldD" class="field">
 
                     <label>
                         Jadwal Lampu
@@ -752,26 +752,6 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
                         </option>
 
                     </select>
-
-                </div>
-
-
-                <!-- LAMP STATUS -->
-
-                <div class="lamp-status">
-
-                    <span
-                        id="relayDLampDot"
-                        class="lamp-dot"
-                    ></span>
-
-
-                    <span
-                        id="relayDLampText"
-                        class="lamp-text"
-                    >
-                        LAMPU MATI
-                    </span>
 
                 </div>
 
@@ -1322,14 +1302,17 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
     function handleModeChange(relay) {
         const modeSelect = document.getElementById("relay" + relay + "Mode");
         const btnOn = document.getElementById("btnOn" + relay);
+        const scheduleField = document.getElementById("scheduleField" + relay);
 
-        if (!modeSelect || !btnOn) return;
+        if (!modeSelect || !btnOn || !scheduleField) return;
 
         if (modeSelect.value === "schedule") {
+            scheduleField.style.display = "block";
             btnOn.innerHTML = "💾 Save";
             btnOn.classList.remove("btn-on");
             btnOn.classList.add("btn-save");
         } else {
+            scheduleField.style.display = "none";
             btnOn.innerHTML = "💡 ON";
             btnOn.classList.remove("btn-save");
             btnOn.classList.add("btn-on");
