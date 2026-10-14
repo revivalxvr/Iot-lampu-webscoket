@@ -227,7 +227,7 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
 
 
         /* ==================================================
-           LAMP STATUS
+           LAMP STATUS (Compact tanpa dot)
            ================================================== */
 
         .lamp-status {
@@ -238,59 +238,31 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
 
             justify-content: center;
 
-            gap: 12px;
-
             background: #ffffff;
 
-            border-radius: 18px;
+            border-radius: 12px;
 
-            padding: 18px;
+            padding: 10px 14px;
 
-            margin-bottom: 18px;
+            margin-bottom: 12px;
 
             border: 1px solid #eeeeee;
         }
 
 
-        .lamp-dot {
-
-            width: 20px;
-
-            height: 20px;
-
-            border-radius: 50%;
-
-            background: #ed3d45;
-
-            box-shadow:
-                0 0 8px
-                rgba(237, 61, 69, 0.25);
-        }
-
-
-        .lamp-dot.on {
-
-            background: #38a849;
-
-            box-shadow:
-                0 0 12px
-                rgba(56, 168, 73, 0.5);
-        }
-
-
         .lamp-text {
 
-            font-size: 19px;
+            font-size: 15px;
 
             font-weight: 800;
 
-            color: #e5363d;
+            color: #ed3838;
         }
 
 
         .lamp-text.on {
 
-            color: #2c963d;
+            color: #3da447;
         }
 
 
@@ -674,7 +646,7 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
 
                 </div>
 
-                <!-- STATUS -->
+                <!-- STATUS (Indikator Murni Tanpa Dot) -->
 
                 <div class="field">
 
@@ -682,19 +654,9 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
                         Status Lampu
                     </label>
 
-
-                    <select id="relayDToggle">
-
-                        <option value="off">
-                            🔴 OFF
-                        </option>
-
-
-                        <option value="on">
-                            🟢 ON
-                        </option>
-
-                    </select>
+                    <div class="lamp-status">
+                        <span id="relayDLampText" class="lamp-text">OFF</span>
+                    </div>
 
                 </div>
 
@@ -1088,34 +1050,6 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
         remaining
     ) {
 
-        const toggle =
-            document.getElementById(
-                "relay" +
-                relay +
-                "Toggle"
-            );
-
-        // Halaman hanya memuat kartu relay yang dipilih.
-        if (!toggle) {
-            return;
-        }
-
-        if (state) {
-            toggle.value = "on";
-        }
-        else {
-            toggle.value = "off";
-        }
-
-
-        const lampDot =
-            document.getElementById(
-                "relay" +
-                relay +
-                "LampDot"
-            );
-
-
         const lampText =
             document.getElementById(
                 "relay" +
@@ -1123,27 +1057,21 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
                 "LampText"
             );
 
-        if (!lampDot || !lampText) return;
+        if (!lampText) return;
 
 
         if (state) {
 
-            lampDot.classList.add("on");
-
             lampText.classList.add("on");
 
-            lampText.innerText =
-                "LAMPU MENYALA";
+            lampText.innerText = "ON";
 
         }
         else {
 
-            lampDot.classList.remove("on");
-
             lampText.classList.remove("on");
 
-            lampText.innerText =
-                "LAMPU MATI";
+            lampText.innerText = "OFF";
 
         }
 
@@ -1278,21 +1206,6 @@ const char CABAI_HTML[] PROGMEM = R"rawliteral(
 
     }
 
-
-
-    // Pasang listener hanya untuk kontrol yang tersedia pada halaman ini.
-    ["A", "B", "C", "D"].forEach(function(relay) {
-        const toggle = document.getElementById("relay" + relay + "Toggle");
-        if (!toggle) return;
-
-        toggle.addEventListener("change", function() {
-            if (this.value === "on") {
-                turnOn(relay);
-            } else {
-                turnOff(relay);
-            }
-        });
-    });
 
 
     // ======================================================
